@@ -1,7 +1,9 @@
 use std::iter;
 use std::ops::ControlFlow;
 
-use rustc_abi::{BackendRepr, TagEncoding, VariantIdx, Variants, WrappingRange};
+use rustc_abi::{
+    BackendRepr, Integer, IntegerType, TagEncoding, VariantIdx, Variants, WrappingRange,
+};
 use rustc_data_structures::fx::FxHashSet;
 use rustc_errors::DiagMessage;
 use rustc_hir::intravisit::VisitorExt;
@@ -864,8 +866,8 @@ fn ty_is_known_nonnull<'tcx>(
                 return true;
             }
 
-            // `UnsafeCell` has its niche hidden.
-            if def.is_unsafe_cell() {
+            // `UnsafeCell` and `UnsafePinned` have their niche hidden.
+            if def.is_unsafe_cell() || def.is_unsafe_pinned() {
                 return false;
             }
 
@@ -1240,6 +1242,14 @@ impl<'a, 'tcx> ImproperCTypesVisitor<'a, 'tcx> {
                                 ty,
                                 reason: fluent::lint_improper_ctypes_enum_repr_reason,
                                 help: Some(fluent::lint_improper_ctypes_enum_repr_help),
+                            };
+                        }
+
+                        if let Some(IntegerType::Fixed(Integer::I128, _)) = def.repr().int {
+                            return FfiUnsafe {
+                                ty,
+                                reason: fluent::lint_improper_ctypes_128bit,
+                                help: None,
                             };
                         }
 

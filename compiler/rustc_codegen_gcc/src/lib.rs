@@ -22,7 +22,7 @@
 #![warn(rust_2018_idioms)]
 #![warn(unused_lifetimes)]
 #![deny(clippy::pattern_type_mismatch)]
-#![allow(clippy::needless_lifetimes)]
+#![allow(clippy::needless_lifetimes, clippy::uninlined_format_args)]
 
 // Some "regular" crates we want to share with rustc
 extern crate object;
@@ -188,10 +188,10 @@ impl CodegenBackend for GccCodegenBackend {
         crate::DEFAULT_LOCALE_RESOURCE
     }
 
-    fn init(&self, sess: &Session) {
+    fn init(&self, _sess: &Session) {
         #[cfg(feature = "master")]
         {
-            let target_cpu = target_cpu(sess);
+            let target_cpu = target_cpu(_sess);
 
             // Get the second TargetInfo with the correct CPU features by setting the arch.
             let context = Context::default();

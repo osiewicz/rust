@@ -7,11 +7,11 @@ use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
 use rustc_data_structures::temp_dir::MaybeTempDir;
 use rustc_hir::def::DefKind;
 use rustc_hir::def_id::LocalDefId;
+use rustc_fs_util::TempDirBuilder;
 use rustc_middle::ty::{InstanceKind, TyCtxt};
 use rustc_session::config::{CrateType, OutFileName, OutputType};
 use rustc_session::output::filename_for_metadata;
 use rustc_session::{MetadataKind, Session};
-use tempfile::Builder as TempFileBuilder;
 
 use crate::errors::{
     BinaryOutputToTty, FailedCopyToStdout, FailedCreateEncodedMetadata, FailedCreateFile,
@@ -51,7 +51,7 @@ pub fn encode_and_write_metadata(tcx: TyCtxt<'_>) -> (EncodedMetadata, bool) {
     // final destination, with an `fs::rename` call. In order for the rename to
     // always succeed, the temporary file needs to be on the same filesystem,
     // which is why we create it inside the output directory specifically.
-    let metadata_tmpdir = TempFileBuilder::new()
+    let metadata_tmpdir = TempDirBuilder::new()
         .prefix("rmeta")
         .tempdir_in(out_filename.parent().unwrap_or_else(|| Path::new("")))
         .unwrap_or_else(|err| tcx.dcx().emit_fatal(FailedCreateTempdir { err }));

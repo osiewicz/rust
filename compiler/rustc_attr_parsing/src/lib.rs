@@ -77,9 +77,8 @@
 
 // tidy-alphabetical-start
 #![allow(internal_features)]
-#![cfg_attr(doc, recursion_limit = "256")] // FIXME(nnethercote): will be removed by #124141
+#![cfg_attr(bootstrap, feature(let_chains))]
 #![doc(rust_logo)]
-#![feature(let_chains)]
 #![feature(rustdoc_internals)]
 // tidy-alphabetical-end
 
