@@ -698,6 +698,16 @@ impl<'ll, CX: Borrow<SCx<'ll>>> GenericCx<'ll, CX> {
             llvm::LLVMMDStringInContext2(self.llcx(), name.as_ptr() as *const c_char, name.len())
         })
     }
+
+    pub(crate) fn get_functions(&self) -> Vec<&'ll Value> {
+        let mut functions = vec![];
+        let mut func = unsafe { llvm::LLVMGetFirstFunction(self.llmod()) };
+        while let Some(f) = func {
+            functions.push(f);
+            func = unsafe { llvm::LLVMGetNextFunction(f) }
+        }
+        functions
+    }
 }
 
 impl<'ll, 'tcx> MiscCodegenMethods<'tcx> for CodegenCx<'ll, 'tcx> {
@@ -999,10 +1009,26 @@ impl<'ll> CodegenCx<'ll, '_> {
         ifn!("llvm.minnum.f64", fn(t_f64, t_f64) -> t_f64);
         ifn!("llvm.minnum.f128", fn(t_f128, t_f128) -> t_f128);
 
+        ifn!("llvm.minimum.f16", fn(t_f16, t_f16) -> t_f16);
+        ifn!("llvm.minimum.f32", fn(t_f32, t_f32) -> t_f32);
+        ifn!("llvm.minimum.f64", fn(t_f64, t_f64) -> t_f64);
+        // There are issues on x86_64 and aarch64 with the f128 variant.
+        //  - https://github.com/llvm/llvm-project/issues/139380
+        //  - https://github.com/llvm/llvm-project/issues/139381
+        // ifn!("llvm.minimum.f128", fn(t_f128, t_f128) -> t_f128);
+
         ifn!("llvm.maxnum.f16", fn(t_f16, t_f16) -> t_f16);
         ifn!("llvm.maxnum.f32", fn(t_f32, t_f32) -> t_f32);
         ifn!("llvm.maxnum.f64", fn(t_f64, t_f64) -> t_f64);
         ifn!("llvm.maxnum.f128", fn(t_f128, t_f128) -> t_f128);
+
+        ifn!("llvm.maximum.f16", fn(t_f16, t_f16) -> t_f16);
+        ifn!("llvm.maximum.f32", fn(t_f32, t_f32) -> t_f32);
+        ifn!("llvm.maximum.f64", fn(t_f64, t_f64) -> t_f64);
+        // There are issues on x86_64 and aarch64 with the f128 variant.
+        //  - https://github.com/llvm/llvm-project/issues/139380
+        //  - https://github.com/llvm/llvm-project/issues/139381
+        // ifn!("llvm.maximum.f128", fn(t_f128, t_f128) -> t_f128);
 
         ifn!("llvm.floor.f16", fn(t_f16) -> t_f16);
         ifn!("llvm.floor.f32", fn(t_f32) -> t_f32);

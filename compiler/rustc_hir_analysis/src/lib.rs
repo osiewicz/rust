@@ -216,17 +216,13 @@ pub fn check_crate(tcx: TyCtxt<'_>) {
                 check::maybe_check_static_with_link_section(tcx, item_def_id);
             }
             DefKind::Const if tcx.generics_of(item_def_id).is_empty() => {
-                let instance = ty::Instance::new(item_def_id.into(), ty::GenericArgs::empty());
+                let instance = ty::Instance::new_raw(item_def_id.into(), ty::GenericArgs::empty());
                 let cid = GlobalId { instance, promoted: None };
                 let typing_env = ty::TypingEnv::fully_monomorphized();
                 tcx.ensure_ok().eval_to_const_value_raw(typing_env.as_query_input(cid));
             }
             _ => (),
         }
-    });
-
-    tcx.par_hir_body_owners(|item_def_id| {
-        let def_kind = tcx.def_kind(item_def_id);
         // Skip `AnonConst`s because we feed their `type_of`.
         if !matches!(def_kind, DefKind::AnonConst) {
             tcx.ensure_ok().typeck(item_def_id);

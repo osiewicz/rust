@@ -162,11 +162,6 @@ impl Command {
         }
     }
 
-    pub fn output(&mut self) -> io::Result<(ExitStatus, Vec<u8>, Vec<u8>)> {
-        let (proc, pipes) = self.spawn(Stdio::MakePipe, false)?;
-        crate::sys_common::process::wait_with_output(proc, pipes)
-    }
-
     // WatchOS and TVOS headers mark the `fork`/`exec*` functions with
     // `__WATCHOS_PROHIBITED __TVOS_PROHIBITED`, and indicate that the
     // `posix_spawn*` functions should be used instead. It isn't entirely clear
@@ -442,7 +437,7 @@ impl Command {
         envp: Option<&CStringArray>,
     ) -> io::Result<Option<Process>> {
         #[cfg(target_os = "linux")]
-        use core::sync::atomic::{AtomicU8, Ordering};
+        use core::sync::atomic::{Atomic, AtomicU8, Ordering};
 
         use crate::mem::MaybeUninit;
         use crate::sys::{self, cvt_nz, on_broken_pipe_flag_used};
@@ -475,7 +470,7 @@ impl Command {
                     fn pidfd_getpid(pidfd: libc::c_int) -> libc::c_int;
                 );
 
-                static PIDFD_SUPPORTED: AtomicU8 = AtomicU8::new(0);
+                static PIDFD_SUPPORTED: Atomic<u8> = AtomicU8::new(0);
                 const UNKNOWN: u8 = 0;
                 const SPAWN: u8 = 1;
                 // Obtaining a pidfd via the fork+exec path might work

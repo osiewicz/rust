@@ -124,7 +124,7 @@ use rustc_target::spec::SymbolVisibility;
 use tracing::debug;
 
 use crate::collector::{self, MonoItemCollectionStrategy, UsageMap};
-use crate::errors::{CouldntDumpMonoStats, SymbolAlreadyDefined, UnknownCguCollectionMode};
+use crate::errors::{CouldntDumpMonoStats, SymbolAlreadyDefined};
 
 struct PartitioningCx<'a, 'tcx> {
     tcx: TyCtxt<'tcx>,
@@ -644,6 +644,8 @@ fn characteristic_def_id_of_mono_item<'tcx>(
                 | ty::InstanceKind::CloneShim(..)
                 | ty::InstanceKind::ThreadLocalShim(..)
                 | ty::InstanceKind::FnPtrAddrShim(..)
+                | ty::InstanceKind::FutureDropPollShim(..)
+                | ty::InstanceKind::AsyncDropGlue(..)
                 | ty::InstanceKind::AsyncDropGlueCtorShim(..) => return None,
             };
 
@@ -796,7 +798,9 @@ fn mono_item_visibility<'tcx>(
     let def_id = match instance.def {
         InstanceKind::Item(def_id)
         | InstanceKind::DropGlue(def_id, Some(_))
-        | InstanceKind::AsyncDropGlueCtorShim(def_id, Some(_)) => def_id,
+        | InstanceKind::FutureDropPollShim(def_id, _, _)
+        | InstanceKind::AsyncDropGlue(def_id, _)
+        | InstanceKind::AsyncDropGlueCtorShim(def_id, _) => def_id,
 
         // We match the visibility of statics here
         InstanceKind::ThreadLocalShim(def_id) => {
@@ -812,7 +816,6 @@ fn mono_item_visibility<'tcx>(
         | InstanceKind::ClosureOnceShim { .. }
         | InstanceKind::ConstructCoroutineInClosureShim { .. }
         | InstanceKind::DropGlue(..)
-        | InstanceKind::AsyncDropGlueCtorShim(..)
         | InstanceKind::CloneShim(..)
         | InstanceKind::FnPtrAddrShim(..) => return Visibility::Hidden,
     };
@@ -1124,27 +1127,10 @@ where
 }
 
 fn collect_and_partition_mono_items(tcx: TyCtxt<'_>, (): ()) -> MonoItemPartitions<'_> {
-    let collection_strategy = match tcx.sess.opts.unstable_opts.print_mono_items {
-        Some(ref s) => {
-            let mode = s.to_lowercase();
-            let mode = mode.trim();
-            if mode == "eager" {
-                MonoItemCollectionStrategy::Eager
-            } else {
-                if mode != "lazy" {
-                    tcx.dcx().emit_warn(UnknownCguCollectionMode { mode });
-                }
-
-                MonoItemCollectionStrategy::Lazy
-            }
-        }
-        None => {
-            if tcx.sess.link_dead_code() {
-                MonoItemCollectionStrategy::Eager
-            } else {
-                MonoItemCollectionStrategy::Lazy
-            }
-        }
+    let collection_strategy = if tcx.sess.link_dead_code() {
+        MonoItemCollectionStrategy::Eager
+    } else {
+        MonoItemCollectionStrategy::Lazy
     };
 
     let (items, usage_map) = collector::collect_crate_mono_items(tcx, collection_strategy);
@@ -1206,7 +1192,7 @@ fn collect_and_partition_mono_items(tcx: TyCtxt<'_>, (): ()) -> MonoItemPartitio
         }
     }
 
-    if tcx.sess.opts.unstable_opts.print_mono_items.is_some() {
+    if tcx.sess.opts.unstable_opts.print_mono_items {
         let mut item_to_cgus: UnordMap<_, Vec<_>> = Default::default();
 
         for cgu in codegen_units {

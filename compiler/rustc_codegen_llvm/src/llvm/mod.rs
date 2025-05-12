@@ -41,6 +41,32 @@ pub(crate) fn AddFunctionAttributes<'ll>(
     }
 }
 
+pub(crate) fn HasAttributeAtIndex<'ll>(
+    llfn: &'ll Value,
+    idx: AttributePlace,
+    kind: AttributeKind,
+) -> bool {
+    unsafe { LLVMRustHasAttributeAtIndex(llfn, idx.as_uint(), kind) }
+}
+
+pub(crate) fn HasStringAttribute<'ll>(llfn: &'ll Value, name: &str) -> bool {
+    unsafe { LLVMRustHasFnAttribute(llfn, name.as_c_char_ptr(), name.len()) }
+}
+
+pub(crate) fn RemoveStringAttrFromFn<'ll>(llfn: &'ll Value, name: &str) {
+    unsafe { LLVMRustRemoveFnAttribute(llfn, name.as_c_char_ptr(), name.len()) }
+}
+
+pub(crate) fn RemoveRustEnumAttributeAtIndex(
+    llfn: &Value,
+    place: AttributePlace,
+    kind: AttributeKind,
+) {
+    unsafe {
+        LLVMRustRemoveEnumAttributeAtIndex(llfn, place.as_uint(), kind);
+    }
+}
+
 pub(crate) fn AddCallSiteAttributes<'ll>(
     callsite: &'ll Value,
     idx: AttributePlace,
@@ -337,12 +363,13 @@ pub(crate) fn last_error() -> Option<String> {
     }
 }
 
-/// Owns an [`OperandBundle`], and will dispose of it when dropped.
-pub(crate) struct OperandBundleOwned<'a> {
+/// Owning pointer to an [`OperandBundle`] that will dispose of the bundle
+/// when dropped.
+pub(crate) struct OperandBundleBox<'a> {
     raw: ptr::NonNull<OperandBundle<'a>>,
 }
 
-impl<'a> OperandBundleOwned<'a> {
+impl<'a> OperandBundleBox<'a> {
     pub(crate) fn new(name: &str, vals: &[&'a Value]) -> Self {
         let raw = unsafe {
             LLVMCreateOperandBundle(
@@ -352,21 +379,21 @@ impl<'a> OperandBundleOwned<'a> {
                 vals.len() as c_uint,
             )
         };
-        OperandBundleOwned { raw: ptr::NonNull::new(raw).unwrap() }
+        Self { raw: ptr::NonNull::new(raw).unwrap() }
     }
 
-    /// Returns inner `OperandBundle` type.
+    /// Dereferences to the underlying `&OperandBundle`.
     ///
-    /// This could be a `Deref` implementation, but `OperandBundle` contains an extern type and
-    /// `Deref::Target: ?Sized`.
-    pub(crate) fn raw(&self) -> &OperandBundle<'a> {
+    /// This can't be a `Deref` implementation because `OperandBundle` transitively
+    /// contains an extern type, which is incompatible with `Deref::Target: ?Sized`.
+    pub(crate) fn as_ref(&self) -> &OperandBundle<'a> {
         // SAFETY: The returned reference is opaque and can only used for FFI.
         // It is valid for as long as `&self` is.
         unsafe { self.raw.as_ref() }
     }
 }
 
-impl Drop for OperandBundleOwned<'_> {
+impl Drop for OperandBundleBox<'_> {
     fn drop(&mut self) {
         unsafe {
             LLVMDisposeOperandBundle(self.raw);
